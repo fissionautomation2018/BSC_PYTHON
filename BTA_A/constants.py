@@ -1,0 +1,19 @@
+
+# ==========================
+# CONSTANTS
+# ==========================
+
+MAX_MODULES_PER_BMU = 56
+CAN_BITRATE = 500_000
+
+MAX_NUMBER_OF_BMU = 22
+
+LOW_BASE_ID = 64
+HIGH_BASE_ID = 1296
+
+LOW_RANGE_SIZE = 32
+HIGH_RANGE_SIZE = 16
+
+MAX_FRAMES_PER_BMU = 48
+
+
