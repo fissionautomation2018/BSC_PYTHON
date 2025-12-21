@@ -14,14 +14,14 @@ def make_test_bytes(bmu_id, frame_no):
     Unique 8-byte pattern for validation
     """
     return bytes([
-        0x03,
-        0xFF,
-        0x04,
-        0x04,
-        0x05,
-        0x06,
-        0x07,
-        0x08
+        0x03, # sync counter
+        0XFF,
+        0x00,
+        0x00,
+        0x00,
+        0x00,
+        0x00,
+        0x00
 
     ])
 
@@ -30,7 +30,7 @@ def make_test_bytes(bmu_id, frame_no):
 # -----------------------------
 for bmu in range(1, 23):            # BMU 1..22
     for frame in range(1, 33):      # Frame 1..32
-        cob_id = consts.LOW_BASE_ID + (bmu - 1) * consts.LOW_RANGE_SIZE + (frame - 1)
+        cob_id = consts.LOW_BASE_ID + (bmu - 1) * consts.LOW_RANGE_SIZE + (frame - 1) # Original line
         BMU_CAN_READ_DATA.process_single_frame(
             cob_id,
             make_test_bytes(bmu, frame)
