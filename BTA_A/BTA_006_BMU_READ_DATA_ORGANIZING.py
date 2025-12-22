@@ -85,39 +85,53 @@ def BMU_READ_DATA_ORGANIZING(bmu_raw):
         return USINT_TO_UINT(DF(bmu_raw, frame, b1), DF(bmu_raw, frame, b2))
 
     idx = 27
-
-    # Module 28
-    BMU_INPUT_DATA.Module_Cell_Failure_or_Balance_Status[idx] = read_module(7, 6, 7)
-    idx += 1
-
-    # Modules 2..56
-    for f in range(8, 16):
-        for pair in [(2, 3), (4, 5), (6, 7)]:
-            if idx < len(BMU_INPUT_DATA.Module_Cell_Failure_or_Balance_Status):
-                BMU_INPUT_DATA.Module_Cell_Failure_or_Balance_Status[idx] = read_module(f, *pair)
-                idx += 1
+    # Module 28 → fixed position
+    BMU_INPUT_DATA.Module_Cell_Failure_or_Balance_Status[27] = read_module(7, 6, 7)
 
     # ---------------- Frame 8 ----------------
+    idx = 0  # start from module index 0
+    for f in range(8, 17):
+        for pair in [(2, 3), (4, 5), (6, 7)]:
+
+            # Skip reserved index for Module 28
+            if idx == 27:
+                idx += 1
+
+            # Stop if array is full
+            if idx >= len(BMU_INPUT_DATA.Module_Cell_Failure_or_Balance_Status):
+                break
+
+            BMU_INPUT_DATA.Module_Cell_Failure_or_Balance_Status[idx] = read_module(f, *pair)
+            idx += 1
+
     BMU_INPUT_DATA.Parallel_No_Of_Branch = DF(bmu_raw, 8, 8)
 
     # ---------------- Cell Voltages (12) ----------------
-    cv = 0
-    for f in range(17, 21):
-        for pair in [(2, 3), (4, 5), (6, 7)]:
-            if cv < 12:
-                BMU_INPUT_DATA.Cell_Voltage[cv] = read_module(f, *pair)
-                cv += 1
-
     BMU_INPUT_DATA.Data_Aquisition_Location = DF(bmu_raw, 17, 8)
+
+    # Cell index mapping
+    cell_index = 0
+
+    for frame in range(17, 21):          # Frames 17,18,19,20
+        for byte_pair in [(2, 3), (4, 5), (6, 7)]:
+            if cell_index >= 12:
+                break
+
+            BMU_INPUT_DATA.Cell_Voltage[cell_index] = read_module(
+                frame, byte_pair[0], byte_pair[1]
+            )
+
+            cell_index += 1
+
 
     # ---------------- Cell Temperatures (6) ----------------
     for i in range(6):
-        BMU_INPUT_DATA.Cell_Temperature[i] = USINT_TO_SINT(DF(bmu_raw, 23, 2 + i))
+        BMU_INPUT_DATA.Cell_Temperature[i] = USINT_TO_SINT(DF(bmu_raw, 21, 2 + i))
 
     # ---------------- Cell Temperatures (13) ----------------
     temps = [
-        (24,2),(24,3),(24,4),(24,5),(24,6),(24,7),(24,8),
-        (25,2),(25,3),(25,4),(25,5),(25,6),(25,7)
+        (22,2),(22,3),(22,4),(22,5),(22,6),(22,7),(22,8),
+        (23,2),(23,3),(23,4),(23,5),(23,6),(23,7)
     ]
     for i, (f, b) in enumerate(temps):
         BMU_INPUT_DATA.Cell_Temperature_1[i] = USINT_TO_SINT(DF(bmu_raw, f, b))

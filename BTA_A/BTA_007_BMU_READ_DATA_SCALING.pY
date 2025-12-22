@@ -7,18 +7,41 @@ from constants import MAX_MODULES_PER_BMU
 from DUT_BMU_READ_DATA_LOCAL import DUT_BMU_READ_DATA_LOCAL, MAX_MODULES_PER_BMU
 
 def GET_BIT(val: int, bit: int) -> bool:
-    return ((val >> bit) & 0x01) == 1
+    return bool(val & (1 << bit))
 
 def MT_BMU_ABNORMALITY_DETAIL(code: int, local):
     """
     Decodes BMU_Abnormality_Detail into flags
     """
-
-    # Reset all first (PLC does this implicitly each cycle)
-    for field in vars(local):
-        if field.endswith("_Failure") or field.endswith("_fault") or field.endswith("_abnormality"):
-            setattr(local, field, False)
-
+    local.BMU_substrate_Power_Failure = False
+    local.BMU_substrate_Other_Failure = False
+    local.CMU_Communication_failure = False
+    local.CMU_Power_failure = False
+    local.CMU_Ground_fault = False
+    local.CMU_Circuite_Failure = False
+    local.CMU_Other_Failure = False
+    local.Current_sensor_Communication_failure = False
+    local.Current_sensor_Power_failure = False
+    local.Current_sensor_Circuite_Failure = False
+    local.Ground_control_relay_Ground_fault = False
+    local.Ground_control_relay_Short_circuit = False
+    local.Ground_control_relay_Welding = False
+    local.Main_contactor_P_Ground_fault = False
+    local.Main_contactor_P_Short_circuit = False
+    local.Main_contactor_P_Welding = False
+    local.Main_contactor_N_Ground_fault = False
+    local.Main_contactor_N_Short_circuit = False
+    local.Main_contactor_N_Welding = False
+    local.Pre_charge_contactor_Ground_fault = False
+    local.Pre_charge_contactor_Short_circuit = False
+    local.Non_volatile_memory_Other_Failure = False
+    local.Other_components_Power_failure = False
+    local.Other_components_Ground_fault = False
+    local.Other_components_Circuite_Failure = False
+    local.Main_circuit_Open = False
+    local.Main_circuit_Other_Failure = False
+    
+    
     # PLC CASE mapping
     if code == 130:
         local.BMU_substrate_Power_Failure = True
@@ -240,23 +263,31 @@ def BMU_READ_DATA_SCALING(BMU_DATA_INPUT):
     # ==========================================================
 
     for MODULE_NO in range(MAX_MODULES_PER_BMU):
-        for CELL_NO in range(12):
-            BMU_READ_DATA_LOCAL.Cell_Failure_Flag[CELL_NO] = GET_BIT(
-                BMU_DATA_INPUT.Module_Cell_Failure_or_Balance_Status[MODULE_NO], CELL_NO)
-            BMU_READ_DATA_LOCAL.Cell_Balance_Status[CELL_NO] = GET_BIT(
-                BMU_DATA_INPUT.Module_Cell_Failure_or_Balance_Status[MODULE_NO],15)
-            
-        # DATA AQUISTION LOCATION
-        BMU_READ_DATA_LOCAL.Data_Aquisition_Location = BMU_DATA_INPUT.Data_Aquisition_Location
+        word = BMU_DATA_INPUT.Module_Cell_Failure_or_Balance_Status[MODULE_NO]
 
-        # CELL VOLTAGE IN PARTICULAR MODULE
+        # Cell failure bits (0..11)
         for CELL_NO in range(12):
-            if BMU_READ_DATA_LOCAL.Data_Aquisition_Location == MODULE_NO + 1:
-                BMU_READ_DATA_LOCAL.Cell_Voltage[CELL_NO] = (
-                    0.0 if BMU_DATA_INPUT.Cell_Voltage[CELL_NO] >= 65534
-                    else BMU_DATA_INPUT.Cell_Voltage[CELL_NO] / 1000.0
+            BMU_READ_DATA_LOCAL.Cell_Failure_Flag[MODULE_NO][CELL_NO] = bool(
+                (word >> CELL_NO) & 0x01
+            )
+
+        # Balance status (bit 15)
+        BMU_READ_DATA_LOCAL.Cell_Balance_Status[MODULE_NO] = bool(
+            (word >> 15) & 0x01
+        )
+
+            
+        # DATA ACQUISITION LOCATION (1-based)
+        module_index = BMU_DATA_INPUT.Data_Aquisition_Location - 1
+
+        if 0 <= module_index < MAX_MODULES_PER_BMU:
+            for cell in range(12):
+                raw = BMU_DATA_INPUT.Cell_Voltage[cell]
+                BMU_READ_DATA_LOCAL.Cell_Voltage[module_index][cell] = (
+                    0.0 if raw >= 65534 else raw / 1000.0
                 )
-                MODULE_NUMBER = BMU_READ_DATA_LOCAL.Data_Aquisition_Location
+
+
 
         # CELL TEMPERATURE IN PARTICULAR MODULE
         for CELL_NO in range(6):

@@ -6,8 +6,7 @@ from constants import *
 # BMU DATA CLASS
 # ==========================
 class BMU_CAN_Data:
-    def __init__(self, bmu_id):
-        self.bmu_id = bmu_id
+    def __init__(self):
         # 48 frames × 8 bytes
         self.can_frames = [None] * MAX_FRAMES_PER_BMU
 
@@ -17,16 +16,13 @@ class BMU_CAN_Data:
         """
         self.can_frames[frame_index] = list(data_bytes)
 
-    def is_complete(self):
-        return all(frame is not None for frame in self.can_frames)
-
 
 # ==========================
 # BMU MANAGER
 # ==========================
 class BMU_CAN_DATA_ORGANIZING:
     def __init__(self):
-        self.bmus = [BMU_CAN_Data(i + 1) for i in range(MAX_NUMBER_OF_BMU)]
+        self.bmus = [BMU_CAN_Data() for _ in range(MAX_NUMBER_OF_BMU)]
 
     def process_single_frame(self, cob_id, data_bytes):
         """
