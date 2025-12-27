@@ -276,17 +276,18 @@ def BMU_READ_DATA_SCALING(BMU_DATA_INPUT):
             (word >> 15) & 0x01
         )
 
-            
-        # DATA ACQUISITION LOCATION (1-based)
-        module_index = BMU_DATA_INPUT.Data_Aquisition_Location - 1
 
-        if 0 <= module_index < MAX_MODULES_PER_BMU:
-            for cell in range(12):
-                raw = BMU_DATA_INPUT.Cell_Voltage[cell]
-                BMU_READ_DATA_LOCAL.Cell_Voltage[module_index][cell] = (
+        BMU_READ_DATA_LOCAL.Data_Aquisition_Location = BMU_DATA_INPUT.Data_Aquisition_Location
+        
+        # DATA ACQUISITION LOCATION (1-based)
+        MODULE_NO = BMU_DATA_INPUT.Data_Aquisition_Location - 1
+
+        if 0 <= MODULE_NO < MAX_MODULES_PER_BMU:
+            for CELL_NO in range(12):
+                raw = BMU_DATA_INPUT.Cell_Voltage[CELL_NO]
+                BMU_READ_DATA_LOCAL.Cell_Voltage[MODULE_NO][CELL_NO] = (
                     0.0 if raw >= 65534 else raw / 1000.0
                 )
-
 
 
         # CELL TEMPERATURE IN PARTICULAR MODULE

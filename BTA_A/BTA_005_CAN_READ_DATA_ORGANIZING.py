@@ -1,63 +1,37 @@
-
 from constants import *
 
-
-# ==========================
-# BMU DATA CLASS
-# ==========================
 class BMU_CAN_Data:
     def __init__(self):
-        # 48 frames × 8 bytes
         self.can_frames = [None] * MAX_FRAMES_PER_BMU
 
-    def store_frame(self, frame_index, data_bytes):
-        """
-        data_bytes: bytes or bytearray (length 8)
-        """
-        self.can_frames[frame_index] = list(data_bytes)
 
-
-# ==========================
-# BMU MANAGER
-# ==========================
 class BMU_CAN_DATA_ORGANIZING:
     def __init__(self):
-        self.bmus = [BMU_CAN_Data() for _ in range(MAX_NUMBER_OF_BMU)]
+        self.BMU_CAN_RAW_DATA = [
+            BMU_CAN_Data() for _ in range(MAX_NUMBER_OF_BMU)
+        ]
 
     def process_single_frame(self, cob_id, data_bytes):
         """
-        ONE call = ONE CAN frame
-        Stores frame in correct BMU & frame index
-        Returns ALL BMUs data
+        Stores one CAN frame persistently.
+        Returns:
+            (bmu_index, frame_index) or (None, None)
         """
 
-        # -------------------------
-        # LOW COB-ID RANGE
-        # -------------------------
-        if LOW_BASE_ID <= cob_id < LOW_BASE_ID + MAX_NUMBER_OF_BMU * LOW_RANGE_SIZE:
-            offset = cob_id - LOW_BASE_ID
-            bmu_index = offset // LOW_RANGE_SIZE
-            frame_index = offset % LOW_RANGE_SIZE
+        # -------- LOW RANGE (32 frames) --------
+        for bmu_index in range(MAX_NUMBER_OF_BMU):
+            base = 32 + (bmu_index + 1) * 32
+            if base <= cob_id < base + 32:
+                frame_index = cob_id - base
+                self.BMU_CAN_RAW_DATA[bmu_index].can_frames[frame_index] = list(data_bytes)
+                return bmu_index, frame_index
 
-        # -------------------------
-        # HIGH COB-ID RANGE
-        # -------------------------
-        elif HIGH_BASE_ID <= cob_id < HIGH_BASE_ID + MAX_NUMBER_OF_BMU * HIGH_RANGE_SIZE:
-            offset = cob_id - HIGH_BASE_ID
-            bmu_index = offset // HIGH_RANGE_SIZE
-            frame_index = 32 + (offset % HIGH_RANGE_SIZE)
+        # -------- HIGH RANGE (16 frames) --------
+        for bmu_index in range(MAX_NUMBER_OF_BMU):
+            base = 1280 + (bmu_index + 1) * 16
+            if base <= cob_id < base + 16:
+                frame_index = 32 + (cob_id - base)
+                self.BMU_CAN_RAW_DATA[bmu_index].can_frames[frame_index] = list(data_bytes)
+                return bmu_index, frame_index
 
-        else:
-            # Not a BMU frame
-            return self.bmus
-
-        # Safety check
-        if bmu_index >= MAX_NUMBER_OF_BMU:
-            return self.bmus
-
-        # -------------------------
-        # Store BYTE-wise data
-        # -------------------------
-        self.bmus[bmu_index].store_frame(frame_index, data_bytes)
-
-        return self.bmus
+        return None, None

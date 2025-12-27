@@ -1,85 +1,104 @@
-
+import time
+import can
+import sys
+import os
 import constants as consts
+import platform
+import random
+
 import BTA_005_CAN_READ_DATA_ORGANIZING
 import BTA_006_BMU_READ_DATA_ORGANIZING
 import BTA_007_BMU_READ_DATA_SCALING
 
+sys.path.append(os.path.abspath("DUT/BMU"))
+
+# ============================================================
+    # BMU DATA ORGANIZER (PERSISTENT)
+# ============================================================
+
+BMU_CAN_READ_DATA_LOCAL = BTA_005_CAN_READ_DATA_ORGANIZING.BMU_CAN_DATA_ORGANIZING()
 
 
-# -----------------------------
-# Helper to generate test bytes
-# -----------------------------
-def make_test_bytes():
-    """
-    Unique 8-byte pattern for validation
-    """
-    return bytes([
-        0, # sync counter
-        10, # 2nd byte
-        0, # 3rd byte
-        10, # 4th byte
-        0, # 5th byte
-        10, # 6th byte
-        0, # 7th byte
-        1, # 8th byte
-    ])
-
-cob_id = 80
+# Persistent BMU LOCAL STORAGE (DO NOT ERASE)
+BMU_LOCAL_CACHE = {}   # key = bmu_id, value = DUT_BMU_READ_DATA_LOCAL
 
 
-# -----------------------------
-# CAN RAW DATA ORGANIZING BMU WISE BASED ON COB-ID
-# -----------------------------
-BMU_CAN_READ_DATA = BTA_005_CAN_READ_DATA_ORGANIZING.BMU_CAN_DATA_ORGANIZING()
-BMU_CAN_READ_DATA.process_single_frame(
-    cob_id,
-    make_test_bytes()
-)
-#---------------------------------------------
+# ============================================================
+# HELPER: SEND TEST FRAME (SIMULATION)
+# ============================================================
 
-# -----------------------------
-# Verification
-# -----------------------------
-ALL_BMU_DATA = BMU_CAN_READ_DATA.bmus
-
-# -------------------------------------------------
-# EACH BMU CAN RAW DATA ORGANIZING TO BMU INPUT DATA STRUCTURE BYTEWISE
-# -------------------------------------------------
-BMU_READ_DATA_INPUT = []  # Initialize variable
-for bmu_raw in ALL_BMU_DATA:
-    # Decode raw CAN frames into structured data
-    BMU_READ_DATA_INPUT.append(BTA_006_BMU_READ_DATA_ORGANIZING.BMU_READ_DATA_ORGANIZING(
-        bmu_raw
-    ))
-#-------------------------------------------------
-
-# -------------------------------------------------
-# BMU INPUT DATA STRUCTURE TO BMU LOCAL DATA STRUCTURE SCALINGWISE
-# -------------------------------------------------
-BMU_READ_DATA_LOCAL_LIST = []
-for bmu_data in BMU_READ_DATA_INPUT:
-    BMU_READ_DATA_LOCAL_LIST.append(
-        BTA_007_BMU_READ_DATA_SCALING.BMU_READ_DATA_SCALING(bmu_data)
+def send_test_frame(cob_id: int, data: bytes):
+    msg = can.Message(
+        arbitration_id=cob_id,
+        data=data,
+        is_extended_id=False
     )
-#-------------------------------------------------
+    return msg
 
 
+# ============================================================
+# MAIN LOOP
+# ============================================================
+
+print("Starting BMU Windows test loop...\n")
 
 
+while True:
 
+    def make_test_bytes():
+        return bytes([1,10, 20, 20, 30, 40, 20, 10])
 
+    # --------------------------------------------------------
+    # SIMULATE CAN FRAME ARRIVAL
+    # --------------------------------------------------------
+    COB_ID = random.randint(64,767)
+    print("COB_ID:", COB_ID)
 
+    CAN_MESSAGE = send_test_frame(COB_ID, make_test_bytes())
 
-# -----------------------------
- # ONLY FOR TESTING PURPOSES
-# -----------------------------
-# # Example: Print the first BMU's local data
-# for key, value in BMU_READ_DATA_LOCAL_LIST[0].__dict__.items():
-#     print(f"{key}: {value}")
+    # --------------------------------------------------------
+    # RAW CAN → BMU RAW ORGANIZATION
+    # --------------------------------------------------------
+    bmu_id, frame_index = BMU_CAN_READ_DATA_LOCAL.process_single_frame(
+        CAN_MESSAGE.arbitration_id,
+        CAN_MESSAGE.data
+    )
 
-print(f"Data_Aquisition_Location : ", BMU_READ_DATA_INPUT[0].Data_Aquisition_Location)
+    # --------------------------------------------------------
+    # PROCESS ONLY THE BMU THAT RECEIVED THIS FRAME
+    # --------------------------------------------------------
+    for BMU_NO in range(0, consts.MAX_NUMBER_OF_BMU):
+        if BMU_NO is not None:
 
-for i in range(0,56):
-    print(f"Cell_Voltage[{i}] : ", BMU_READ_DATA_LOCAL_LIST[0].Cell_Voltage[i])
+            BMU_CAN_DATA_LOCAL = BMU_CAN_READ_DATA_LOCAL.BMU_CAN_RAW_DATA[BMU_NO]
 
+            # RAW → INPUT STRUCTURE
+            BMU_READ_DATA_INPUT = (
+                BTA_006_BMU_READ_DATA_ORGANIZING.BMU_READ_DATA_ORGANIZING(BMU_CAN_DATA_LOCAL)
+            )
 
+            # INPUT → LOCAL (SCALING)
+            BMU_READ_DATA_LOCAL = (
+                BTA_007_BMU_READ_DATA_SCALING.BMU_READ_DATA_SCALING(BMU_READ_DATA_INPUT)
+            )
+
+            # ----------------------------------------------------
+            # PERSIST DATA (FRAME-STICKY)
+            # ----------------------------------------------------
+            if BMU_NO not in BMU_LOCAL_CACHE:
+                BMU_LOCAL_CACHE[BMU_NO] = BMU_READ_DATA_LOCAL
+            else:
+                old = BMU_LOCAL_CACHE[BMU_NO]
+                for k, v in BMU_READ_DATA_LOCAL.__dict__.items():
+                    if v is not None:
+                        setattr(old, k, v)
+
+        # --------------------------------------------------------
+        # DISPLAY (READ-ONLY)
+        # --------------------------------------------------------
+
+        for BMU_ID, BMU_DATA in BMU_LOCAL_CACHE.items():
+            print(f"\nBMU {BMU_ID + 1}")
+            print(f"Data_Aquisition_Location : {BMU_DATA}")
+       
+        time.sleep(1)
